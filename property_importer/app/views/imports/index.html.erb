@@ -1,0 +1,109 @@
+<div class="index-two-col">
+  <div class="index-left">
+    <div class="step-bar">
+      <span class="step active">1. Upload CSV</span>
+      <span class="step">2. Preview & fix</span>
+      <span class="step">3. Resolve conflicts</span>
+      <span class="step">4. Summary & confirm</span>
+    </div>
+
+    <%= form_with url: imports_path, method: :post, local: true, multipart: true, id: "import-form" do |f| %>
+      <div class="form-upload">
+        <input type="file" name="csv_file" id="csv_file_input" accept=".csv" required style="display: none;" />
+        <div class="drop-zone" id="drop_zone" role="button" tabindex="0" aria-label="Drop CSV file or click to browse">
+          <span class="drop-icon" aria-hidden="true">📄</span>
+          <span class="drop-text" id="drop_text">Drop CSV here or click to browse</span>
+          <span class="drop-hint" id="drop_hint">Upload a CSV with columns: Building Name, Street Address, Unit, City, State, Zip Code. Unit is optional (property-only rows).</span>
+        </div>
+      </div>
+      <button type="submit" class="btn" id="submit_btn" disabled>Upload and continue</button>
+    <% end %>
+  </div>
+
+  <div class="index-right">
+    <h2>Imports in progress</h2>
+    <% if @recent_sessions.any? %>
+      <% @recent_sessions.each do |s| %>
+        <div class="upload-entry">
+          <div class="upload-entry-title">
+            <%= link_to s.file_name.presence || "Import ##{s.id}", preview_import_path(s) %>
+          </div>
+          <div class="upload-status-bar">
+            <span class="status-badge <%= s.status %>"><%= s.status %></span>
+            <span><%= s.staged_rows.count %> rows</span>
+            <span><%= s.created_at.strftime("%b %d, %H:%M") %></span>
+            <% if s.draft? %>
+              <%= button_to "Discard", discard_import_path(s), method: :delete, class: "btn btn-secondary", form: { data: { turbo_confirm: "Discard this import?" }, style: "display:inline; margin:0;" } %>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    <% else %>
+      <p class="caption">No imports yet. Upload a CSV to get started.</p>
+    <% end %>
+  </div>
+</div>
+
+<script>
+(function() {
+  const form = document.getElementById("import-form");
+  const input = document.getElementById("csv_file_input");
+  const dropZone = document.getElementById("drop_zone");
+  const dropText = document.getElementById("drop_text");
+  const dropHint = document.getElementById("drop_hint");
+  const submitBtn = document.getElementById("submit_btn");
+
+  function updateUI(file) {
+    if (file) {
+      dropText.textContent = file.name;
+      dropHint.textContent = (file.size / 1024).toFixed(1) + " KB • Click or drop a different file to change";
+      dropZone.classList.add("has-file");
+      submitBtn.disabled = false;
+    } else {
+      dropText.textContent = "Drop CSV here or click to browse";
+      dropHint.textContent = "Accepts .csv files only";
+      dropZone.classList.remove("has-file");
+      submitBtn.disabled = true;
+    }
+  }
+
+  dropZone.addEventListener("click", function() { input.click(); });
+
+  dropZone.addEventListener("keydown", function(e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
+  });
+
+  input.addEventListener("change", function() {
+    updateUI(this.files[0] || null);
+  });
+
+  ["dragenter", "dragover"].forEach(function(ev) {
+    dropZone.addEventListener(ev, function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.add("drag-over");
+    });
+  });
+
+  ["dragleave", "drop"].forEach(function(ev) {
+    dropZone.addEventListener(ev, function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.remove("drag-over");
+    });
+  });
+
+  dropZone.addEventListener("drop", function(e) {
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      dropText.textContent = "Please drop a .csv file";
+      return;
+    }
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    updateUI(file);
+  });
+})();
+</script>

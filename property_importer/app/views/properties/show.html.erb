@@ -1,0 +1,15 @@
+<h1><%= @property.building_name %></h1>
+<p><%= @property.street_address %>, <%= @property.city %>, <%= @property.state %> <%= @property.zip_code %></p>
+
+<h2>Units</h2>
+<% if @units.any? %>
+  <ul>
+    <% @units.each do |u| %>
+      <li><%= u.unit_number %></li>
+    <% end %>
+  </ul>
+<% else %>
+  <p>No units (property-only).</p>
+<% end %>
+
+<%= link_to "Back to properties", properties_path, class: "btn btn-secondary" %>

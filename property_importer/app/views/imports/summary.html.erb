@@ -1,0 +1,22 @@
+<div class="step-bar">
+  <span class="step done">1. Upload CSV</span>
+  <span class="step done">2. Preview & fix</span>
+  <span class="step done">3. Resolve conflicts</span>
+  <span class="step active">4. Summary & confirm</span>
+</div>
+
+<p>You are about to add:</p>
+<ul>
+  <li><strong><%= @summary[:new_properties] %></strong> new properties (<%= @summary[:new_units_total] %> units)</li>
+  <li><strong><%= @summary[:existing_properties] %></strong> existing properties: <strong><%= @summary[:existing_new_units] %></strong> new units</li>
+</ul>
+
+<%= link_to "Back to conflicts", conflicts_import_path(@import_session), class: "btn btn-secondary" %>
+
+<% if @import_session.draft? %>
+  <%= button_to "Confirm import", confirm_import_path(@import_session), method: :post, class: "btn", data: { disable_with: "Importing…" } %>
+  <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-secondary", form: { data: { turbo_confirm: "Discard this import? Staged data will be permanently deleted." } } %>
+<% else %>
+  <p>This import has already been committed.</p>
+  <%= link_to "View properties", properties_path, class: "btn" %>
+<% end %>

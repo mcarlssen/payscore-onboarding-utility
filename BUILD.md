@@ -140,6 +140,7 @@ Upload CSV → Parse → Staged rows (edit/validate) → Conflict resolution →
 - **CSV storage:** Either attach the file to `ImportSession` (e.g. Active Storage) for audit, or only persist parsed data in `staged_rows`; document the choice.
 - **Confirm:** One ActiveRecord transaction: create/update `properties` and `units` from staged data, then set `import_sessions.status = 'committed'`. On exception, rollback and set status to `failed` (or leave `draft`) so user can retry.
 - **No auth / no multi-tenancy:** Single user; no scoping by tenant or user.
+- **Styling:** CSS theme from https://colorffy.com/dark-theme-generator?colors=cb770f-121212&success=22946E&warning=A87A2A&danger=9C2121&info=21498A&primaryCount=6&surfaceCount=6
 
 ---
 

@@ -1,0 +1,14 @@
+/.bundle
+/lib/bundler/man
+/log/*
+/tmp/*
+!/log/.keep
+!/tmp/.keep
+/config/master.key
+/storage/*
+!/storage/.keep
+/public/assets
+.env
+*.swp
+*.swo
+.DS_Store

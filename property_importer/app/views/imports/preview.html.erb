@@ -1,0 +1,94 @@
+<div class="step-bar">
+  <span class="step done">1. Upload CSV</span>
+  <span class="step active">2. Preview & fix</span>
+  <span class="step">3. Resolve conflicts</span>
+  <span class="step">4. Summary & confirm</span>
+</div>
+
+<% if @has_errors %>
+  <p class="errors">Some rows have validation errors. Fix them before continuing.</p>
+<% end %>
+
+<%= form_with url: preview_update_import_path(@import_session), method: :patch, id: "preview-form", data: { turbo: false } do |f| %>
+  <table>
+    <thead>
+      <tr>
+        <th>Row</th>
+        <th>Building Name</th>
+        <th>Street Address</th>
+        <th>Unit</th>
+        <th>City</th>
+        <th>State</th>
+        <th>Zip Code</th>
+        <th>Errors</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @staged_rows.each do |row| %>
+        <tr>
+          <td><%= row.row_number %></td>
+          <td><input type="text" name="staged_rows[<%= row.id %>][building_name]" value="<%= row.building_name %>" data-row-field="<%= row.id %>-building_name" /></td>
+          <td><input type="text" name="staged_rows[<%= row.id %>][street_address]" value="<%= row.street_address %>" data-row-field="<%= row.id %>-street_address" /></td>
+          <td><input type="text" name="staged_rows[<%= row.id %>][unit_number]" value="<%= row.unit_number %>" data-row-field="<%= row.id %>-unit_number" /></td>
+          <td><input type="text" name="staged_rows[<%= row.id %>][city]" value="<%= row.city %>" data-row-field="<%= row.id %>-city" /></td>
+          <td><input type="text" name="staged_rows[<%= row.id %>][state]" value="<%= row.state %>" data-row-field="<%= row.id %>-state" /></td>
+          <td><input type="text" name="staged_rows[<%= row.id %>][zip_code]" value="<%= row.zip_code %>" data-row-field="<%= row.id %>-zip_code" /></td>
+          <td class="errors"><%= row.validation_errors.present? ? JSON.parse(row.validation_errors).join("; ") : "" rescue "" %></td>
+          <td>
+            <%= link_to "Delete", import_staged_row_path(@import_session, row), method: :delete, data: { turbo_confirm: "Delete this row?" }, class: "btn btn-danger btn-sm" %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+  <p>
+    <%= link_to "← Back to upload", root_path, class: "btn btn-secondary" %>
+    <%= link_to "Next: Resolve conflicts", conflicts_import_path(@import_session), class: "btn" %>
+  </p>
+<% end %>
+<p>
+  <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-secondary", form: { data: { turbo_confirm: "Discard this import? Staged data will be permanently deleted." } } %>
+</p>
+
+<script>
+(function() {
+  var form = document.getElementById("preview-form");
+  if (!form) return;
+  var debounce;
+  form.addEventListener("focusin", function(e) {
+    if (!e.target.matches("input")) return;
+    e.target.dataset.initialValue = e.target.value;
+  }, true);
+  form.addEventListener("focusout", function(e) {
+    if (!e.target.matches("input")) return;
+    var input = e.target;
+    var initial = input.dataset.initialValue || "";
+    if (input.value === initial) return;
+    var fieldId = input.dataset.rowField;
+    if (fieldId) form.dataset.pendingFlash = fieldId;
+    clearTimeout(debounce);
+    debounce = setTimeout(function() { form.requestSubmit(); }, 600);
+  }, true);
+  form.addEventListener("submit", function(e) {
+    e.preventDefault();
+    var fieldId = form.dataset.pendingFlash;
+    fetch(form.action, {
+      method: "PATCH",
+      body: new FormData(form),
+      headers: {
+        "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]').content,
+        "Accept": "application/json"
+      }
+    }).then(function(r) {
+      if (r.ok) {
+        var input = form.querySelector('input[data-row-field="' + fieldId + '"]');
+        if (input) {
+          input.classList.add("flash-success");
+          setTimeout(function() { input.classList.remove("flash-success"); }, 2000);
+        }
+      }
+    }).finally(function() { delete form.dataset.pendingFlash; });
+  });
+})();
+</script>

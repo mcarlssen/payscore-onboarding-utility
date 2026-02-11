@@ -1,0 +1,30 @@
+<h1>Properties</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th>Building name</th>
+      <th>Address</th>
+      <th>City</th>
+      <th>State</th>
+      <th>Zip</th>
+      <th>Units</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @properties.each do |p| %>
+      <tr>
+        <td><%= p.building_name %></td>
+        <td><%= p.street_address %></td>
+        <td><%= p.city %></td>
+        <td><%= p.state %></td>
+        <td><%= p.zip_code %></td>
+        <td><%= p.units.count %></td>
+        <td><%= link_to "View", property_path(p) %></td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
+
+<p><%= link_to "New import", root_path, class: "btn" %></p>

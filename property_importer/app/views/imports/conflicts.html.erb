@@ -1,0 +1,77 @@
+<div class="step-bar">
+  <span class="step done">1. Upload CSV</span>
+  <span class="step done">2. Preview & fix</span>
+  <span class="step active">3. Resolve conflicts</span>
+  <span class="step">4. Summary & confirm</span>
+</div>
+
+<% if @conflicts.empty? %>
+  <p>No conflicts: no staged property already exists in the database.</p>
+  <p>
+    <%= link_to "← Back to Preview", preview_import_path(@import_session), class: "btn btn-secondary" %>
+    <%= link_to "Next: Summary & confirm", summary_import_path(@import_session), class: "btn" %>
+  </p>
+  <% return %>
+<% end %>
+
+<%= form_with url: conflicts_resolve_import_path(@import_session), method: :patch, local: true do |f| %>
+  <% @conflicts.each do |c| %>
+    <div class="conflict-card">
+      <h3><%= c[:existing_property].building_name %> — <%= c[:existing_property].street_address %>, <%= c[:existing_property].city %></h3>
+      <% existing_display = c[:existing_units].any? ? c[:existing_units].join(", ") : "none" %>
+      <% new_units = c[:staged_units] - c[:conflicting_units] %>
+      <% import_adds_display = new_units.any? ? new_units.join(", ") : "property only" %>
+      <p>Existing units: <strong><%= existing_display %></strong>. Import adds: <strong><%= import_adds_display %></strong>.</p>
+      <% if c[:conflicting_units].any? %>
+        <p class="errors">Unit number(s) already exist: <%= c[:conflicting_units].join(", ") %>. Choose to skip each or add anyway (skip = do not import that unit).</p>
+        <ul>
+          <% c[:conflicting_rows].each do |row| %>
+            <li>
+              Unit <%= row.unit_number %>
+              <label><input type="checkbox" name="skip_unit[]" value="<%= row.id %>" <%= row.skip_unit ? "checked" : "" %> /> Skip this unit</label>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+      <p>
+        <label><input type="checkbox" name="skip_property[]" value="<%= c[:key] %>" /> Skip this entire property (do not add any units)</label>
+      </p>
+      <div class="conflict-preview-table">
+        <h4>Staged data for this property</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Row</th>
+              <th>Building Name</th>
+              <th>Street Address</th>
+              <th>Unit</th>
+              <th>City</th>
+              <th>State</th>
+              <th>Zip</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% c[:rows].sort_by(&:row_number).each do |row| %>
+              <tr class="<%= 'row-conflict' if row.unit_number_present? && c[:conflicting_units].include?(row.unit_number.to_s.strip) %>">
+                <td><%= row.row_number %></td>
+                <td><%= row.building_name %></td>
+                <td><%= row.street_address %></td>
+                <td><%= row.unit_number.presence || "—" %></td>
+                <td><%= row.city %></td>
+                <td><%= row.state %></td>
+                <td><%= row.zip_code %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
+  <p>
+    <%= link_to "← Back to Preview", preview_import_path(@import_session), class: "btn btn-secondary" %>
+    <button type="submit" class="btn">Next: Summary</button>
+  </p>
+<% end %>
+<p>
+  <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-secondary", form: { data: { turbo_confirm: "Discard this import? Staged data will be permanently deleted." } } %>
+</p>
