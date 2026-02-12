@@ -74,8 +74,8 @@ You should see something like: `Listening on http://0.0.0.0:3000` or `http://127
 ### 6. Try an import
 
 1. On the home page, click “Choose File” and select a CSV with columns: **Building Name, Street Address, Unit, City, State, Zip Code** (see `Payscore Property CSV Import Example - Properties.csv` in the assessment folder).
-2. Click “Upload and continue” → you’re on **Preview & fix**. Edit any cell and click “Save changes” if you want.
-3. Click “Next: Resolve conflicts” → if the CSV matches existing properties, you can skip units or skip the whole property.
+2. Click “Upload and continue” → you’re on **Preview Import**. Edit any cell and click “Save changes” if you want.
+3. Click “Next: Deduplication” → if the CSV matches existing properties, you can skip units or skip the whole property.
 4. Click “Next: Summary” then **Confirm import** → data is written to the database.
 5. Use **Properties** in the nav to see the list and open a property to see its units.
 
@@ -120,7 +120,7 @@ In the terminal where the server is running, press **Ctrl+C**.
 |------|--------|
 | `GET /` | Upload CSV (step 1) |
 | `POST /imports` | Create import session and parse CSV |
-| `GET /imports/:id/preview` | Preview & fix (step 2) |
+| `GET /imports/:id/preview` | Preview Import (step 2) |
 | `PATCH /imports/:id/preview_update` | Save edits to staged rows |
 | `GET /imports/:id/conflicts` | Resolve conflicts (step 3) |
 | `PATCH /imports/:id/conflicts_resolve` | Save conflict choices |

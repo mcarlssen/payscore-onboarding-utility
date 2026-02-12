@@ -48,6 +48,7 @@ class CsvImportParser
         val = row[header]&.to_s
         h[key] = val
       end
+      next if row_blank?(h)
       out << h
     end
     out
@@ -57,14 +58,18 @@ class CsvImportParser
 
   private
 
+  def row_blank?(h)
+    %w[building_name street_address city state zip_code].all? { |k| h[k].to_s.strip.blank? }
+  end
+
   def run_validations(session)
     session.staged_rows.reload.each do |row|
       errs = []
-      errs << "Building Name required" if row.building_name.blank?
-      errs << "Street Address required" if row.street_address.blank?
-      errs << "City required" if row.city.blank?
-      errs << "State required" if row.state.blank?
-      errs << "Zip Code required" if row.zip_code.blank?
+      errs << "Building Name required" if row.building_name.to_s.strip.upcase.blank?
+      errs << "Street Address required" if row.street_address.to_s.strip.upcase.blank?
+      errs << "City required" if row.city.to_s.strip.upcase.blank?
+      errs << "State required" if row.state.to_s.strip.upcase.blank?
+      errs << "Zip Code required" if row.zip_code.to_s.strip.upcase.blank?
       row.update_column(:validation_errors, errs.presence&.to_json)
     end
   end

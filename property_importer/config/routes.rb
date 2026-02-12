@@ -12,6 +12,7 @@ Rails.application.routes.draw do
       patch :conflicts_resolve
       get :summary
       post :confirm
+      post :rollback
       delete :discard
     end
   end

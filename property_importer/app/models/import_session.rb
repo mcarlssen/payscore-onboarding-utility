@@ -3,7 +3,7 @@
 class ImportSession < ApplicationRecord
   has_many :staged_rows, dependent: :destroy
 
-  STATUSES = %w[draft committed failed].freeze
+  STATUSES = %w[draft committed failed rolled_back].freeze
   validates :status, inclusion: { in: STATUSES }
 
   def committed?
@@ -12,5 +12,9 @@ class ImportSession < ApplicationRecord
 
   def draft?
     status == "draft"
+  end
+
+  def rolled_back?
+    status == "rolled_back"
   end
 end

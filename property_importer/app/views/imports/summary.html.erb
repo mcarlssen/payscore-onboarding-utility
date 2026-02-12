@@ -1,7 +1,7 @@
 <div class="step-bar">
   <span class="step done">1. Upload CSV</span>
-  <span class="step done">2. Preview & fix</span>
-  <span class="step done">3. Resolve conflicts</span>
+  <span class="step done">2. Preview Import</span>
+  <span class="step done">3. Deduplication</span>
   <span class="step active">4. Summary & confirm</span>
 </div>
 
@@ -11,11 +11,81 @@
   <li><strong><%= @summary[:existing_properties] %></strong> existing properties: <strong><%= @summary[:existing_new_units] %></strong> new units</li>
 </ul>
 
-<%= link_to "Back to conflicts", conflicts_import_path(@import_session), class: "btn btn-secondary" %>
+<% if @rows_to_import.any? %>
+  <h4>Data being added (<%= @rows_to_import.size %> rows)</h4>
+  <table class="preview-table">
+    <colgroup>
+      <col style="width: 3rem" /><%# Row %>
+      <col style="width: 16rem" /><%# Building Name %>
+      <col style="width: 16rem" /><%# Street Address %>
+      <col style="width: 3.5rem" /><%# Unit %>
+      <col style="width: 8rem" /><%# City %>
+      <col style="width: 3rem" /><%# State %>
+      <col style="width: 5rem" /><%# Zip Code %>
+      <col style="width: 8rem" /><%# Errors %>
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Row</th>
+        <th>Building Name</th>
+        <th>Street Address</th>
+        <th>Unit</th>
+        <th>City</th>
+        <th>State</th>
+        <th>Zip Code</th>
+        <th>Errors</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @rows_to_import.each do |row| %>
+        <tr>
+          <td class="row-cell"><span class="row-number"><%= row.row_number %></span></td>
+          <td><%= row.building_name %></td>
+          <td><%= row.street_address %></td>
+          <td><%= row.unit_number.presence || "—" %></td>
+          <td><%= row.city %></td>
+          <td><%= row.state %></td>
+          <td><%= row.zip_code %></td>
+          <td class="errors"><%= row.formatted_validation_errors %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
 
 <% if @import_session.draft? %>
-  <%= button_to "Confirm import", confirm_import_path(@import_session), method: :post, class: "btn", data: { disable_with: "Importing…" } %>
-  <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-secondary", form: { data: { turbo_confirm: "Discard this import? Staged data will be permanently deleted." } } %>
+  <div class="confirm-section" id="confirm-import-section">
+    <div class="import-progress" id="import-progress" hidden aria-hidden="true">
+      <div class="import-progress-bar"></div>
+      <p class="import-progress-text">Importing…</p>
+    </div>
+    <div class="preview-actions">
+      <div class="preview-actions-left">
+        <%= link_to "Back to conflicts", conflicts_import_path(@import_session), class: "btn btn-secondary" %>
+        <%= button_to "Confirm import", confirm_import_path(@import_session), method: :post, class: "btn", id: "confirm-import-btn", form: { id: "confirm-import-form", data: { turbo: false } } %>
+      </div>
+      <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-danger btn-sm", form: { data: { turbo_confirm: "Discard this import? Staged data will be permanently deleted." } } %>
+    </div>
+  </div>
+  <script>
+    (function() {
+      var form = document.getElementById("confirm-import-form");
+      var btn = document.getElementById("confirm-import-btn");
+      var progress = document.getElementById("import-progress");
+      if (!form || !btn || !progress) return;
+      form.addEventListener("submit", function() {
+        btn.disabled = true;
+        btn.classList.add("btn-loading");
+        if (btn.tagName === "INPUT") {
+          btn.value = "Importing…";
+        } else {
+          btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Importing…';
+        }
+        progress.hidden = false;
+        progress.setAttribute("aria-hidden", "false");
+      });
+    })();
+  </script>
 <% else %>
   <p>This import has already been committed.</p>
   <%= link_to "View properties", properties_path, class: "btn" %>

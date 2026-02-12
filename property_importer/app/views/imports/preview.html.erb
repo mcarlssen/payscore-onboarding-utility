@@ -1,16 +1,28 @@
 <div class="step-bar">
   <span class="step done">1. Upload CSV</span>
-  <span class="step active">2. Preview & fix</span>
-  <span class="step">3. Resolve conflicts</span>
+  <span class="step active">2. Preview Import</span>
+  <span class="step">3. Deduplication</span>
   <span class="step">4. Summary & confirm</span>
 </div>
 
 <% if @has_errors %>
-  <p class="errors">Some rows have validation errors. Fix them before continuing.</p>
+  <p class="errors">Some rows have validation errors. Fix them before continuing to deduplication check.</p>
+<% else %>
+  <p class="caption">Sanity check data below. Continue to next step for deduplication check.</p>
 <% end %>
 
 <%= form_with url: preview_update_import_path(@import_session), method: :patch, id: "preview-form", data: { turbo: false } do |f| %>
-  <table>
+  <table class="preview-table">
+    <colgroup>
+      <col style="width: 3rem" /><%# Row %>
+      <col style="width: 16rem" /><%# Building Name %>
+      <col style="width: 16rem" /><%# Street Address %>
+      <col style="width: 3.5rem" /><%# Unit %>
+      <col style="width: 8rem" /><%# City %>
+      <col style="width: 3rem" /><%# State %>
+      <col style="width: 5rem" /><%# Zip Code %>
+      <col style="width: 8rem" /><%# Errors %>
+    </colgroup>
     <thead>
       <tr>
         <th>Row</th>
@@ -21,41 +33,52 @@
         <th>State</th>
         <th>Zip Code</th>
         <th>Errors</th>
-        <th></th>
       </tr>
     </thead>
     <tbody>
       <% @staged_rows.each do |row| %>
         <tr>
-          <td><%= row.row_number %></td>
-          <td><input type="text" name="staged_rows[<%= row.id %>][building_name]" value="<%= row.building_name %>" data-row-field="<%= row.id %>-building_name" /></td>
-          <td><input type="text" name="staged_rows[<%= row.id %>][street_address]" value="<%= row.street_address %>" data-row-field="<%= row.id %>-street_address" /></td>
-          <td><input type="text" name="staged_rows[<%= row.id %>][unit_number]" value="<%= row.unit_number %>" data-row-field="<%= row.id %>-unit_number" /></td>
-          <td><input type="text" name="staged_rows[<%= row.id %>][city]" value="<%= row.city %>" data-row-field="<%= row.id %>-city" /></td>
-          <td><input type="text" name="staged_rows[<%= row.id %>][state]" value="<%= row.state %>" data-row-field="<%= row.id %>-state" /></td>
-          <td><input type="text" name="staged_rows[<%= row.id %>][zip_code]" value="<%= row.zip_code %>" data-row-field="<%= row.id %>-zip_code" /></td>
-          <td class="errors"><%= row.validation_errors.present? ? JSON.parse(row.validation_errors).join("; ") : "" rescue "" %></td>
-          <td>
-            <%= link_to "Delete", import_staged_row_path(@import_session, row), method: :delete, data: { turbo_confirm: "Delete this row?" }, class: "btn btn-danger btn-sm" %>
+          <td class="row-cell">
+            <span class="row-number"><%= row.row_number %></span>
+            <%= link_to import_staged_row_path(@import_session, row), method: :delete, data: { turbo_confirm: "Delete this row?" }, class: "btn-icon btn-icon-danger", title: "Delete row" do %>
+              <svg class="icon-trash" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            <% end %>
           </td>
+          <% err_attrs = row.attributes_with_errors %>
+          <td><input type="text" name="staged_rows[<%= row.id %>][building_name]" value="<%= row.building_name %>" data-row-field="<%= row.id %>-building_name" class="<%= 'field-error' if err_attrs.include?(:building_name) %>" /></td>
+          <td><input type="text" name="staged_rows[<%= row.id %>][street_address]" value="<%= row.street_address %>" data-row-field="<%= row.id %>-street_address" class="<%= 'field-error' if err_attrs.include?(:street_address) %>" /></td>
+          <td><input type="text" name="staged_rows[<%= row.id %>][unit_number]" value="<%= row.unit_number %>" data-row-field="<%= row.id %>-unit_number" /></td>
+          <td><input type="text" name="staged_rows[<%= row.id %>][city]" value="<%= row.city %>" data-row-field="<%= row.id %>-city" class="<%= 'field-error' if err_attrs.include?(:city) %>" /></td>
+          <td><input type="text" name="staged_rows[<%= row.id %>][state]" value="<%= row.state %>" data-row-field="<%= row.id %>-state" class="<%= 'field-error' if err_attrs.include?(:state) %>" /></td>
+          <td><input type="text" name="staged_rows[<%= row.id %>][zip_code]" value="<%= row.zip_code %>" data-row-field="<%= row.id %>-zip_code" class="<%= 'field-error' if err_attrs.include?(:zip_code) %>" /></td>
+          <td class="errors"><%= row.formatted_validation_errors %></td>
         </tr>
       <% end %>
     </tbody>
   </table>
-  <p>
-    <%= link_to "← Back to upload", root_path, class: "btn btn-secondary" %>
-    <%= link_to "Next: Resolve conflicts", conflicts_import_path(@import_session), class: "btn" %>
-  </p>
 <% end %>
-<p>
-  <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-secondary", form: { data: { turbo_confirm: "Discard this import? Staged data will be permanently deleted." } } %>
-</p>
+<div class="preview-actions">
+  <div class="preview-actions-left">
+    <%= link_to "← Back", root_path, class: "btn btn-secondary" %>
+    <%= link_to "Next: Deduplication", conflicts_import_path(@import_session), class: "btn", id: "preview-next-link", data: { conflicts_url: conflicts_import_path(@import_session) } %>
+  </div>
+  <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-danger btn-sm", form: { data: { turbo_confirm: "Discard this import? Staged data will be permanently deleted." } } %>
+</div>
 
 <script>
 (function() {
   var form = document.getElementById("preview-form");
+  var nextLink = document.getElementById("preview-next-link");
   if (!form) return;
   var debounce;
+  if (nextLink) {
+    nextLink.addEventListener("click", function(e) {
+      e.preventDefault();
+      form.dataset.navigateAfter = nextLink.dataset.conflictsUrl || "";
+      clearTimeout(debounce);
+      form.requestSubmit();
+    });
+  }
   form.addEventListener("focusin", function(e) {
     if (!e.target.matches("input")) return;
     e.target.dataset.initialValue = e.target.value;
@@ -81,12 +104,59 @@
         "Accept": "application/json"
       }
     }).then(function(r) {
-      if (r.ok) {
-        var input = form.querySelector('input[data-row-field="' + fieldId + '"]');
-        if (input) {
+      return r.json().then(function(data) {
+        return { status: r.status, data: data };
+      }).catch(function() {
+        return { status: r.status, data: {} };
+      });
+    }).then(function(result) {
+      var input = form.querySelector('input[data-row-field="' + fieldId + '"]');
+      if (result.status === 200 && result.data) {
+        form.querySelectorAll("input.field-error").forEach(function(inp) { inp.classList.remove("field-error"); });
+        form.querySelectorAll("td.errors").forEach(function(cell) { cell.textContent = ""; });
+        var editedFieldHasError = false;
+        if (result.data.errors && Object.keys(result.data.errors).length > 0) {
+          var dashIdx = fieldId ? fieldId.indexOf("-") : -1;
+          var editedRowId = dashIdx >= 0 ? fieldId.substring(0, dashIdx) : null;
+          var editedAttr = dashIdx >= 0 ? fieldId.substring(dashIdx + 1) : null;
+          Object.keys(result.data.errors).forEach(function(rowId) {
+            var errs = result.data.errors[rowId];
+            var errAttrs = [];
+            errs.forEach(function(msg) {
+              if (/building\s*name/i.test(msg)) errAttrs.push("building_name");
+              else if (/street\s*address/i.test(msg)) errAttrs.push("street_address");
+              else if (/\bcity\b/i.test(msg)) errAttrs.push("city");
+              else if (/\bstate\b/i.test(msg)) errAttrs.push("state");
+              else if (/zip\s*code/i.test(msg)) errAttrs.push("zip_code");
+            });
+            if (editedRowId === rowId && editedAttr && errAttrs.indexOf(editedAttr) >= 0) {
+              editedFieldHasError = true;
+            }
+            var rowInput = form.querySelector('input[data-row-field^="' + rowId + '-"]');
+            if (rowInput) {
+              var tr = rowInput.closest("tr");
+              if (tr) {
+                var errCell = tr.querySelector("td.errors");
+                if (errCell) errCell.textContent = errs.every(function(m) { return /required\s*$/.test(m); }) ? errs.map(function(m) { return m.replace(/\s+required\s*$/, ""); }).join(", ") + " required" : errs.join("; ");
+                errAttrs.forEach(function(attr) {
+                  var inp = tr.querySelector('input[data-row-field="' + rowId + '-' + attr + '"]');
+                  if (inp) inp.classList.add("field-error");
+                });
+              }
+            }
+          });
+        }
+        if (input && !editedFieldHasError) {
           input.classList.add("flash-success");
           setTimeout(function() { input.classList.remove("flash-success"); }, 2000);
         }
+      }
+      var navUrl = form.dataset.navigateAfter;
+      var hasErrors = result.data && result.data.errors && Object.keys(result.data.errors).length > 0;
+      if (navUrl && result.status === 200 && !hasErrors) {
+        delete form.dataset.navigateAfter;
+        var sep = navUrl.indexOf("?") >= 0 ? "&" : "?";
+        window.location = navUrl + sep + "t=" + Date.now();
       }
     }).finally(function() { delete form.dataset.pendingFlash; });
   });

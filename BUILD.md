@@ -38,7 +38,7 @@ These choices are locked in. Document them in the README as assumptions/tradeoff
 - **Data split:**  
   - **Production:** `properties`, `units` — only written when the user confirms the import.  
   - **Staged:** `import_sessions`, `staged_rows` — hold the current import in progress; all edits and validation target staged data until confirm.
-- **Flow:** Upload → parse into `staged_rows` under an `ImportSession` → user moves through steps (Preview & fix → Resolve conflicts → Summary) → single “Confirm import” writes from staged to production inside one DB transaction. On failure, transaction rolls back; staged data remains so the user can fix and retry.
+- **Flow:** Upload → parse into `staged_rows` under an `ImportSession` → user moves through steps (Preview Import → Resolve conflicts → Summary) → single “Confirm import” writes from staged to production inside one DB transaction. On failure, transaction rolls back; staged data remains so the user can fix and retry.
 - **Idempotent confirm:** After a successful commit, set session status to `committed` (or equivalent) and refuse a second commit for that session. Disable the Confirm button after first click to avoid double submit.
 
 High-level flow:
@@ -89,9 +89,9 @@ Upload CSV → Parse → Staged rows (edit/validate) → Conflict resolution →
 
 ## 6. UI design
 
-- **Multi-step layout:** Linear steps with one primary CTA per step. Steps: (1) Upload, (2) Preview & fix, (3) Resolve conflicts, (4) Summary & confirm.
+- **Multi-step layout:** Linear steps with one primary CTA per step. Steps: (1) Upload, (2) Preview Import, (3) Resolve conflicts, (4) Summary & confirm.
 - **Progress indicator:** Stepper or tracker (e.g. Upload → Preview → Conflicts → Confirm) so users know where they are and can go back.
-- **Preview & fix:** Table of staged rows (all CSV columns). Inline edit with autosave to `staged_rows`; show “Saved” or checkmark on blur. Validation errors per row (e.g. inline or tooltip). Bulk actions where useful: “Accept all” / “Reject all” per category (e.g. address corrections, duplicate choices).
+- **Preview Import:** Table of staged rows (all CSV columns). Inline edit with autosave to `staged_rows`; show “Saved” or checkmark on blur. Validation errors per row (e.g. inline or tooltip). Bulk actions where useful: “Accept all” / “Reject all” per category (e.g. address corrections, duplicate choices).
 - **Conflict resolution:** For each conflict, show existing vs staged (e.g. side-by-side or clear summary). “Existing: 5 units. Import adds: 3 units. After import: 8 units.” Unit-level choices where applicable (keep / skip per unit). Bulk: e.g. “Add all new units to existing properties.”
 - **Summary before confirm:** Explicit counts, e.g. “You’re about to add **3 new properties** (12 units) and **2 existing properties** (5 new units). [Confirm import].” Single primary button: “Confirm import.” On success → redirect to “Import complete” or property list; on failure → show error, keep staged data, allow Retry.
 - **Large files:** Avoid rendering 2000+ rows in the DOM at once. Use virtualized list, or show first N rows (e.g. 200) with “Show more” / “Export full list,” and indicate “Showing 1–200 of 2000.” Document as a tradeoff in README.
@@ -103,8 +103,8 @@ Upload CSV → Parse → Staged rows (edit/validate) → Conflict resolution →
 | Step | Purpose | What’s shown | Primary action | Data |
 |------|---------|--------------|----------------|------|
 | **1. Upload** | Ingest CSV | File input; after parse: success or error message (+ optional error CSV) | “Upload” / “Next” | Parse into `staged_rows` for new `ImportSession` |
-| **2. Preview & fix** | Edit and validate | Table of staged rows; inline edit; validation errors by row | “Next” | All edits autosave to `staged_rows` |
-| **3. Resolve conflicts** | Match staged vs existing | List of conflicts (staged property already in DB); per-property and per-unit choices | “Add units” / “Skip” (and unit-level); “Next” | Read from `staged_rows` + production `properties`/`units` |
+| **2. Preview Import** | Edit and validate | Table of staged rows; inline edit; validation errors by row | “Next” | All edits autosave to `staged_rows` |
+| **3. Deduplication** | Match staged vs existing | List of conflicts (staged property already in DB); per-property and per-unit choices | “Add units” / “Skip” (and unit-level); “Next” | Read from `staged_rows` + production `properties`/`units` |
 | **4. Summary & confirm** | Final check and commit | Counts (new properties, new units, existing updated); single Confirm | “Confirm import” | Single transaction: staged → production; session status → committed |
 
 - **Back:** User can go back to previous steps without losing edits (all in staged).
@@ -117,7 +117,7 @@ Upload CSV → Parse → Staged rows (edit/validate) → Conflict resolution →
 ### 8.1 MVP (Phase 1)
 
 - Upload CSV; parse into `import_sessions` + `staged_rows`.
-- Steps: Upload → Preview & fix → Resolve conflicts → Summary → Confirm.
+- Steps: Upload → Preview Import → Resolve conflicts → Summary → Confirm.
 - Validation: Required fields; optional format rules (zip, state). Errors by row; optional error CSV download.
 - Property identity: `(building_name, street_address, city, state, zip_code)` in both staged grouping and production lookup.
 - Unit-level dedup and conflict resolution: User can choose keep/skip per unit when adding to an existing property.

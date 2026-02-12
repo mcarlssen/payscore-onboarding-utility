@@ -94,9 +94,10 @@
       }
 
       table { border-collapse: collapse; width: 100%; }
+      .preview-table { table-layout: fixed; }
       th, td {
-        border: 1px solid var(--clr-surface-a20);
-        padding: 0.5rem;
+        /*border: 1px solid var(--clr-surface-a20); */
+        padding: 0.2rem;
         text-align: left;
       }
       th { background: var(--clr-surface-a10); }
@@ -131,6 +132,16 @@
         background: var(--clr-primary-a10);
         color: var(--clr-light-a0);
       }
+      .btn:disabled {
+        background: var(--clr-surface-a30);
+        color: var(--clr-surface-a50);
+        cursor: not-allowed;
+        opacity: 0.9;
+      }
+      .btn:disabled:hover {
+        background: var(--clr-surface-a30);
+        color: var(--clr-surface-a50);
+      }
       .btn-secondary { background: var(--clr-surface-a30); }
       .btn-secondary:hover {
         background: var(--clr-surface-a40);
@@ -139,6 +150,67 @@
       .btn-danger { background: var(--clr-danger-a0); }
       .btn-danger:hover { background: var(--clr-danger-a10); color: var(--clr-light-a0); }
       .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.85rem; }
+      .btn-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.15rem;
+        background: transparent;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        color: var(--clr-surface-a50);
+      }
+      .btn-icon:hover { color: var(--clr-light-a0); background: var(--clr-surface-a20); }
+      .btn-icon-danger:hover { color: var(--clr-danger-a20); background: rgba(156, 33, 33, 0.2); }
+      .row-cell { white-space: nowrap; }
+      .row-cell .row-number { margin-right: 0.35rem; }
+      .icon-trash { display: block; }
+      .btn-loading { opacity: 0.8; cursor: not-allowed; pointer-events: none; }
+      .btn-spinner {
+        display: inline-block;
+        width: 1em;
+        height: 1em;
+        margin-right: 0.4em;
+        vertical-align: -0.2em;
+        border: 2px solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: btn-spin 0.6s linear infinite;
+      }
+      @keyframes btn-spin { to { transform: rotate(360deg); } }
+
+      .confirm-section { margin-top: 1rem; }
+      .import-progress {
+        display: none;
+        margin-bottom: 1rem;
+        padding: 0.75rem;
+        background: var(--clr-surface-tonal-a10);
+        border-radius: 4px;
+        border: 1px solid var(--clr-surface-a20);
+      }
+      .import-progress:not([hidden]) { display: block; }
+      .import-progress-bar {
+        height: 4px;
+        background: var(--clr-surface-a20);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-bottom: 0.5rem;
+      }
+      .import-progress-bar::after {
+        content: "";
+        display: block;
+        height: 100%;
+        width: 40%;
+        background: var(--clr-primary-a0);
+        border-radius: 2px;
+        animation: progress-indeterminate 1.2s ease-in-out infinite;
+      }
+      @keyframes progress-indeterminate {
+        0% { margin-left: -40%; }
+        100% { margin-left: 100%; }
+      }
+      .import-progress-text { margin: 0; font-size: 0.9rem; color: var(--clr-surface-a50); }
 
       .errors { color: var(--clr-danger-a10); font-size: 0.9em; }
 
@@ -156,6 +228,14 @@
         background: rgba(34, 148, 110, 0.35);
         border-color: var(--clr-success-a0);
       }
+      input.flash-error {
+        background: rgba(156, 33, 33, 0.25);
+        border-color: var(--clr-danger-a0);
+      }
+      input.field-error {
+        background: rgba(156, 33, 33, 0.2);
+        border-color: var(--clr-danger-a0);
+      }
       input[type=text]:focus, input[type=file]:focus {
         outline: none;
         border-color: var(--clr-primary-a30);
@@ -166,6 +246,18 @@
       }
 
       .form-upload { margin: 1rem 0; }
+      .upload-actions { margin-top: 1rem; }
+
+      .preview-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+      .preview-actions-left { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+      .preview-actions form { display: inline-block; margin: 0; }
 
       .index-two-col {
         display: grid;
@@ -208,7 +300,9 @@
       .status-badge.draft { background: var(--clr-info-a0); color: var(--clr-info-a20); }
       .status-badge.committed { background: var(--clr-success-a0); color: var(--clr-success-a20); }
       .status-badge.failed { background: var(--clr-danger-a0); color: var(--clr-danger-a20); }
+      .status-badge.rolled_back { background: var(--clr-surface-a30); color: var(--clr-surface-a50); }
       .upload-status-bar .btn { padding: 0.2rem 0.5rem; font-size: 0.75rem; }
+      .upload-status-bar .upload-entry-discard { margin-left: auto; }
 
       .drop-zone {
         display: flex;
@@ -242,7 +336,11 @@
       .conflict-preview-table { margin-top: 1rem; }
       .conflict-preview-table h4 { margin-bottom: 0.5rem; font-size: 0.95rem; }
       .conflict-preview-table table { font-size: 0.9rem; }
+      .keep-unit-radio { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+      tr.conflict-row[data-row-id] { cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+      tr.conflict-row[data-row-id]:hover { background: rgba(64, 119, 209, 0.2) !important; border-left-color: var(--clr-info-a10) !important; }
       tr.row-conflict { background: rgba(156, 33, 33, 0.2); border-left: 3px solid var(--clr-danger-a0); }
+      tr.row-keep { background: rgba(34, 148, 110, 0.25); border-left: 3px solid var(--clr-success-a0); }
 
       a { color: var(--clr-primary-a30); }
       a:hover { color: var(--clr-primary-a50); }
@@ -253,6 +351,16 @@
       }
 
       #toast-zone { margin-bottom: 0; }
+
+      .app-footer {
+        margin-top: 2rem;
+        padding: 1rem 0;
+        border-top: 1px solid var(--clr-surface-a20);
+        font-size: 0.9rem;
+        color: var(--clr-surface-a50);
+      }
+      .footer-content { text-align: center; }
+      .footer-text { margin: 0; }
     </style>
   </head>
   <body>
@@ -268,5 +376,6 @@
     <% if flash[:notice] %><div class="alert alert-notice"><%= flash[:notice] %></div><% end %>
     <% if flash[:alert] %><div class="alert alert-alert"><%= flash[:alert] %></div><% end %>
     <%= yield %>
+    <%= render 'shared/footer' %>
   </body>
 </html>

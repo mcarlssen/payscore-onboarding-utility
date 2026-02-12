@@ -1,40 +1,52 @@
 <div class="step-bar">
   <span class="step done">1. Upload CSV</span>
-  <span class="step done">2. Preview & fix</span>
-  <span class="step active">3. Resolve conflicts</span>
+  <span class="step done">2. Preview Import</span>
+  <span class="step active">3. Deduplication</span>
   <span class="step">4. Summary & confirm</span>
 </div>
 
 <% if @conflicts.empty? %>
-  <p>No conflicts: no staged property already exists in the database.</p>
-  <p>
-    <%= link_to "← Back to Preview", preview_import_path(@import_session), class: "btn btn-secondary" %>
-    <%= link_to "Next: Summary & confirm", summary_import_path(@import_session), class: "btn" %>
-  </p>
-  <% return %>
-<% end %>
-
-<%= form_with url: conflicts_resolve_import_path(@import_session), method: :patch, local: true do |f| %>
-  <% @conflicts.each do |c| %>
+  <p>No conflicts: no staged property already exists in the database, and no duplicate units within this import.</p>
+  <div class="preview-actions">
+    <div class="preview-actions-left">
+      <%= link_to "← Back to Preview", preview_import_path(@import_session), class: "btn btn-secondary" %>
+      <%= link_to "Next: Summary & confirm", summary_import_path(@import_session), class: "btn" %>
+    </div>
+    <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-danger btn-sm", form: { data: { turbo_confirm: "Discard this import? Staged data will be permanently deleted." } } %>
+  </div>
+<% else %>
+<%= form_with url: conflicts_resolve_import_path(@import_session), method: :patch, local: true, id: "conflicts-form" do |f| %>
+  <% @conflicts.each_with_index do |c, c_idx| %>
+    <input type="hidden" name="conflict_keys[]" value="<%= c[:key] %>" />
+    <% first_row = c[:rows].first %>
+    <% row_to_unit_key = {}; c[:rows_by_unit].each { |unit_num, unit_rows| unit_rows.each { |r| row_to_unit_key[r.id] = "c#{c_idx}_u#{unit_num}" } } %>
     <div class="conflict-card">
-      <h3><%= c[:existing_property].building_name %> — <%= c[:existing_property].street_address %>, <%= c[:existing_property].city %></h3>
-      <% existing_display = c[:existing_units].any? ? c[:existing_units].join(", ") : "none" %>
-      <% new_units = c[:staged_units] - c[:conflicting_units] %>
-      <% import_adds_display = new_units.any? ? new_units.join(", ") : "property only" %>
-      <p>Existing units: <strong><%= existing_display %></strong>. Import adds: <strong><%= import_adds_display %></strong>.</p>
+      <h3><%= first_row.building_name %> — <%= first_row.street_address %>, <%= first_row.city %></h3>
+      <% if c[:existing_property] %>
+        <% existing_display = c[:existing_units].any? ? c[:existing_units].join(", ") : "none" %>
+        <% new_units = c[:staged_units] - c[:conflicting_units] %>
+        <% import_adds_display = new_units.any? ? new_units.join(", ") : "property only" %>
+        <p>Existing units in database: <strong><%= existing_display %></strong>. Import adds: <strong><%= import_adds_display %></strong>.</p>
+      <% end %>
+      <% if c[:db_conflicting_units].any? %>
+        <p class="errors">Unit number(s) already exist in database: <%= c[:db_conflicting_units].join(", ") %>. Click the row you want to keep.</p>
+      <% end %>
+      <% if c[:within_import_duplicate_units].any? %>
+        <p class="errors">Duplicate unit(s) within this import: <%= c[:within_import_duplicate_units].join(", ") %>. Click the row you want to keep (others will be skipped).</p>
+      <% end %>
       <% if c[:conflicting_units].any? %>
-        <p class="errors">Unit number(s) already exist: <%= c[:conflicting_units].join(", ") %>. Choose to skip each or add anyway (skip = do not import that unit).</p>
-        <ul>
-          <% c[:conflicting_rows].each do |row| %>
-            <li>
-              Unit <%= row.unit_number %>
-              <label><input type="checkbox" name="skip_unit[]" value="<%= row.id %>" <%= row.skip_unit ? "checked" : "" %> /> Skip this unit</label>
-            </li>
+        <% c[:conflicting_rows].each do |row| %>
+          <input type="hidden" name="conflicting_row_ids[]" value="<%= row.id %>" />
+        <% end %>
+        <% c[:rows_by_unit].each do |unit_num, unit_rows| %>
+          <% unit_key = "c#{c_idx}_u#{unit_num}" %>
+          <% unit_rows.each do |row| %>
+            <input type="radio" name="keep_unit[<%= unit_key %>]" value="<%= row.id %>" id="keep_<%= row.id %>" class="keep-unit-radio" data-unit-key="<%= unit_key %>" data-row-id="<%= row.id %>" <%= 'checked' if row.skip_unit == false %> />
           <% end %>
-        </ul>
+        <% end %>
       <% end %>
       <p>
-        <label><input type="checkbox" name="skip_property[]" value="<%= c[:key] %>" /> Skip this entire property (do not add any units)</label>
+        <label><input type="checkbox" name="skip_property[]" value="<%= c[:key] %>" <%= 'checked' if c[:rows].any?(&:skip_property?) %> /> Skip this entire property (do not add any units)</label>
       </p>
       <div class="conflict-preview-table">
         <h4>Staged data for this property</h4>
@@ -52,7 +64,10 @@
           </thead>
           <tbody>
             <% c[:rows].sort_by(&:row_number).each do |row| %>
-              <tr class="<%= 'row-conflict' if row.unit_number_present? && c[:conflicting_units].include?(row.unit_number.to_s.strip) %>">
+              <% is_conflicting = row.unit_number_present? && c[:conflicting_units].include?(row.unit_number.to_s.strip) %>
+              <% unit_key = row_to_unit_key[row.id] %>
+              <tr class="conflict-row <%= 'row-keep' if is_conflicting && row.skip_unit == false %><%= ' row-conflict' if is_conflicting && row.skip_unit != false %>"
+                  <% if is_conflicting %>data-row-id="<%= row.id %>" data-unit-key="<%= unit_key %>" tabindex="0" role="button" title="Click to keep this row"<% end %>>
                 <td><%= row.row_number %></td>
                 <td><%= row.building_name %></td>
                 <td><%= row.street_address %></td>
@@ -67,11 +82,35 @@
       </div>
     </div>
   <% end %>
-  <p>
-    <%= link_to "← Back to Preview", preview_import_path(@import_session), class: "btn btn-secondary" %>
-    <button type="submit" class="btn">Next: Summary</button>
-  </p>
 <% end %>
-<p>
-  <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-secondary", form: { data: { turbo_confirm: "Discard this import? Staged data will be permanently deleted." } } %>
-</p>
+<div class="preview-actions">
+  <div class="preview-actions-left">
+    <%= link_to "← Back to Preview", preview_import_path(@import_session), class: "btn btn-secondary" %>
+    <button type="submit" form="conflicts-form" class="btn">Next: Summary</button>
+  </div>
+  <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-danger btn-sm", form: { data: { turbo_confirm: "Discard this import? Staged data will be permanently deleted." } } %>
+</div>
+<script>
+(function() {
+  document.querySelectorAll('.conflict-row[data-row-id]').forEach(function(tr) {
+    tr.addEventListener('click', function() {
+      var rowId = this.dataset.rowId;
+      var unitKey = this.dataset.unitKey;
+      var radio = document.getElementById('keep_' + rowId);
+      if (!radio) return;
+      radio.checked = true;
+      document.querySelectorAll('.conflict-row[data-unit-key="' + unitKey + '"]').forEach(function(r) {
+        r.classList.remove('row-keep', 'row-conflict');
+        r.classList.add(r.dataset.rowId === rowId ? 'row-keep' : 'row-conflict');
+      });
+    });
+    tr.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        this.click();
+      }
+    });
+  });
+})();
+</script>
+<% end %>

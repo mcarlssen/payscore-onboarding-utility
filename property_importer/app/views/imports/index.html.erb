@@ -2,8 +2,8 @@
   <div class="index-left">
     <div class="step-bar">
       <span class="step active">1. Upload CSV</span>
-      <span class="step">2. Preview & fix</span>
-      <span class="step">3. Resolve conflicts</span>
+      <span class="step">2. Preview Import</span>
+      <span class="step">3. Deduplication</span>
       <span class="step">4. Summary & confirm</span>
     </div>
 
@@ -16,12 +16,14 @@
           <span class="drop-hint" id="drop_hint">Upload a CSV with columns: Building Name, Street Address, Unit, City, State, Zip Code. Unit is optional (property-only rows).</span>
         </div>
       </div>
-      <button type="submit" class="btn" id="submit_btn" disabled>Upload and continue</button>
+      <div class="upload-actions">
+        <button type="submit" class="btn" id="submit_btn" disabled>Upload and continue</button>
+      </div>
     <% end %>
   </div>
 
   <div class="index-right">
-    <h2>Imports in progress</h2>
+    <h2>Import History</h2>
     <% if @recent_sessions.any? %>
       <% @recent_sessions.each do |s| %>
         <div class="upload-entry">
@@ -33,7 +35,9 @@
             <span><%= s.staged_rows.count %> rows</span>
             <span><%= s.created_at.strftime("%b %d, %H:%M") %></span>
             <% if s.draft? %>
-              <%= button_to "Discard", discard_import_path(s), method: :delete, class: "btn btn-secondary", form: { data: { turbo_confirm: "Discard this import?" }, style: "display:inline; margin:0;" } %>
+              <%= button_to "Discard", discard_import_path(s), method: :delete, class: "btn btn-danger btn-sm", form: { class: "upload-entry-discard", data: { turbo_confirm: "Discard this import?" }, style: "display:inline; margin:0;" } %>
+            <% elsif s.committed? %>
+              <%= button_to "Undo", rollback_import_path(s), method: :post, class: "btn btn-secondary", form: { data: { turbo_confirm: "Undo this import? Properties and units from this import will be removed." }, style: "display:inline; margin:0;" } %>
             <% end %>
           </div>
         </div>
@@ -104,6 +108,12 @@
     dt.items.add(file);
     input.files = dt.files;
     updateUI(file);
+  });
+
+  form.addEventListener("submit", function() {
+    submitBtn.disabled = true;
+    submitBtn.classList.add("btn-loading");
+    submitBtn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span> Processing…';
   });
 })();
 </script>

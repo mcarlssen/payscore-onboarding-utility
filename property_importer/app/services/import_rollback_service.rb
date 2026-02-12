@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-class ImportCommitService
+class ImportRollbackService
   def initialize(import_session)
     @session = import_session
   end
 
   def call
-    return { ok: false, error: "Session already committed" } unless @session.draft?
+    return { ok: false, error: "Only committed imports can be rolled back" } unless @session.committed?
 
     ActiveRecord::Base.transaction do
       grouped = staged_property_groups
@@ -21,26 +21,22 @@ class ImportCommitService
           state: first.state,
           zip_code: first.zip_code
         )
-        prop ||= Property.create!(
-          building_name: first.building_name,
-          street_address: first.street_address,
-          city: first.city,
-          state: first.state,
-          zip_code: first.zip_code
-        )
+        next unless prop
+
         rows.each do |row|
           next unless row.unit_number_present? && !row.skip_unit
-          Unit.find_or_create_by!(property_id: prop.id, unit_number: row.unit_number.to_s.strip)
+          unit_num = row.unit_number.to_s.strip
+          prop.units.find_by(unit_number: unit_num)&.destroy!
         end
+
+        prop.reload
+        prop.destroy! if prop.units.empty?
       end
-      @session.update!(status: "committed")
+      @session.update!(status: "rolled_back")
       { ok: true }
     end
-  rescue ActiveRecord::RecordInvalid => e
-    @session.update!(status: "failed")
-    { ok: false, error: e.message }
   rescue StandardError => e
-    @session.update!(status: "failed") if @session.draft?
+    @session.update!(status: "failed") if @session.committed?
     { ok: false, error: e.message }
   end
 
