@@ -4,7 +4,7 @@ An internal-user-facing Rails tool for importing properties and units from a CSV
 
 Built by [Mike Thorn](https://x38.dev) for the Payscore Technical Operations Engineer assessment.
 
----
+![Dashboard view](images/property-importer.png)
 
 ## How to run locally
 
