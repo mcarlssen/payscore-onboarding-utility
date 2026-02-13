@@ -16,6 +16,18 @@ Built by [Mike Thorn](https://x38.dev) for the Payscore Technical Operations Eng
 
 ### 2. One-time setup
 
+**Option A: One-touch install (recommended)**
+
+From the app folder, run:
+
+```bash
+ruby bin/install
+```
+
+This installs dependencies, creates the database, runs migrations, seeds baseline + staged rows, and starts the server. Open http://localhost:3000 when ready.
+
+**Option B: Manual setup**
+
 Open a terminal and go to the app folder:
 
 ```bash
@@ -47,7 +59,7 @@ If that task fails, you can load the SQL file directly (replace with your DB nam
 psql -U postgres -d property_importer_development -f db/seeds_baseline_dev.sql
 ```
 
-Load sample staged rows (optional — creates a draft import session with rows from `Sample_Import.csv`, as well as examples of prior import history):
+Load sample staged rows (optional — creates draft import sessions and staged rows for testing):
 
 ```bash
 bundle exec rails db:seed_staged_rows
@@ -59,17 +71,13 @@ If PostgreSQL uses a different user, password, or host, edit `config/database.ym
 
 ### 4. Start the app
 
-From the `property_importer` folder:
+If you used manual setup, from the app folder:
 
 ```bash
 bundle exec rails server
 ```
 
-Or the short form:
-
-```bash
-bundle exec rails s
-```
+Or the short form: `bundle exec rails s`
 
 You should see something like: `Listening on http://0.0.0.0:3000` or `http://127.0.0.1:3000`.
 

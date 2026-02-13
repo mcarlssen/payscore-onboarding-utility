@@ -25,10 +25,11 @@ class ImportsController < ApplicationController
   end
 
   def show
-    redirect_to preview_import_path(@import_session)
+    redirect_to @import_session.committed? ? summary_import_path(@import_session) : preview_import_path(@import_session)
   end
 
   def preview
+    return redirect_to summary_import_path(@import_session) if @import_session.committed?
     @staged_rows = @import_session.staged_rows.order(:row_number)
     @has_errors = @staged_rows.any? { |r| r.validation_errors.present? }
   end
@@ -48,7 +49,8 @@ class ImportsController < ApplicationController
       errs << "Street Address required" if row.street_address.to_s.strip.upcase.blank?
       errs << "City required" if row.city.to_s.strip.upcase.blank?
       errs << "State required" if row.state.to_s.strip.upcase.blank?
-      errs << "Zip Code required" if row.zip_code.to_s.strip.upcase.blank?
+      errs << "Zipcode required" if row.zip_code.to_s.strip.upcase.blank?
+      errs << "Zipcode invalid format" if row.zip_code.present? && row.zip_code.to_s !~ /\A[\d-]+\z/
       validation_errors = errs.presence&.to_json
       row.update_column(:validation_errors, validation_errors)
       errors_by_row[row.id] = errs if errs.present?
@@ -60,6 +62,7 @@ class ImportsController < ApplicationController
   end
 
   def conflicts
+    return redirect_to summary_import_path(@import_session) if @import_session.committed?
     clear_orphaned_skip_flags
     @conflicts = conflict_groups
     # Default all conflicting rows to skip on first visit (when no "keep" has been chosen yet)

@@ -12,5 +12,5 @@ FileUtils.chdir APP_ROOT do
   system! "bundle install"
 
   puts "\n== Preparing database =="
-  system! "bin/rails db:create db:migrate db:seed_baseline"
+  system! "bundle exec rails db:create db:migrate db:seed_baseline db:seed_staged_rows"
 end

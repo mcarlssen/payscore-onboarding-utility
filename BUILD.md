@@ -2,6 +2,8 @@
 
 Spec for building the Technical Operations Engineer take-home: a Ruby on Rails internal tool that lets customer success upload a property spreadsheet, sanity-check and fix data, avoid duplicates, and finalize imports confidently. This document is the single source of truth for architecture, business rules, UI design, and build plan. Schema details live in [database-models.md](database-models.md).
 
+This document intended as a guideline for agentic assistance and includes additional information beyond what is intended for human readability. Please refer to the Design Spec page of the app for a more human-friendly version.
+
 ---
 
 ## 1. Overview and goals

@@ -6,7 +6,7 @@ class ImportCommitService
   end
 
   def call
-    return { ok: false, error: "Session already committed" } unless @session.draft?
+    return { ok: false, error: "Session already committed" } if @session.committed?
 
     ActiveRecord::Base.transaction do
       grouped = staged_property_groups
@@ -40,7 +40,7 @@ class ImportCommitService
     @session.update!(status: "failed")
     { ok: false, error: e.message }
   rescue StandardError => e
-    @session.update!(status: "failed") if @session.draft?
+    @session.update!(status: "failed") unless @session.committed?
     { ok: false, error: e.message }
   end
 

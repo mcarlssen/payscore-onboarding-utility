@@ -28,7 +28,7 @@
       <% @recent_sessions.each do |s| %>
         <div class="upload-entry">
           <div class="upload-entry-title">
-            <%= link_to s.file_name.presence || "Import ##{s.id}", preview_import_path(s) %>
+            <%= link_to s.file_name.presence || "Import ##{s.id}", s.committed? ? summary_import_path(s) : preview_import_path(s) %>
           </div>
           <div class="upload-status-bar">
             <span class="status-badge <%= s.status %>"><%= s.status %></span>

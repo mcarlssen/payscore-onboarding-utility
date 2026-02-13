@@ -69,7 +69,8 @@ class CsvImportParser
       errs << "Street Address required" if row.street_address.to_s.strip.upcase.blank?
       errs << "City required" if row.city.to_s.strip.upcase.blank?
       errs << "State required" if row.state.to_s.strip.upcase.blank?
-      errs << "Zip Code required" if row.zip_code.to_s.strip.upcase.blank?
+      errs << "Zipcode required" if row.zip_code.to_s.strip.upcase.blank?
+      errs << "Zipcode invalid format" if row.zip_code.present? && row.zip_code.to_s !~ /\A[\d-]+\z/
       row.update_column(:validation_errors, errs.presence&.to_json)
     end
   end
