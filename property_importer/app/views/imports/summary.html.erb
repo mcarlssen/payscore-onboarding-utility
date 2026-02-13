@@ -5,6 +5,11 @@
   <span class="step active">4. Summary & confirm</span>
 </div>
 
+<% if @has_validation_errors %>
+  <p class="errors">Some rows have validation errors. Fix them in Preview before confirming.</p>
+  <%= link_to "Go to Preview to fix errors", preview_import_path(@import_session), class: "btn btn-secondary" %>
+<% end %>
+
 <p>You are about to add:</p>
 <ul>
   <li><strong><%= @summary[:new_properties] %></strong> new properties (<%= @summary[:new_units_total] %> units)</li>
@@ -62,7 +67,7 @@
     <div class="preview-actions">
       <div class="preview-actions-left">
         <%= link_to "Back to conflicts", conflicts_import_path(@import_session), class: "btn btn-secondary" %>
-        <%= button_to "Confirm import", confirm_import_path(@import_session), method: :post, class: "btn", id: "confirm-import-btn", form: { id: "confirm-import-form", data: { turbo: false } } %>
+        <%= button_to "Confirm import", confirm_import_path(@import_session), method: :post, class: "btn", id: "confirm-import-btn", disabled: @has_validation_errors, form: { id: "confirm-import-form", data: { turbo: false } } %>
       </div>
       <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-danger btn-sm", form: { data: { turbo_confirm: "Discard this import? Staged data will be permanently deleted." } } %>
     </div>

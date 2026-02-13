@@ -2,10 +2,10 @@
 
 class PagesController < ApplicationController
   def design
-    # Will eventually render BUILD.md
+    # Contains build spec
   end
 
   def ideation
-    # Will eventually render thoughts.md
+    # contains ideation documentation
   end
 end

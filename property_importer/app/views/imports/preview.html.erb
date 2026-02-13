@@ -11,6 +11,8 @@
   <p class="caption">Sanity check data below. Continue to next step for deduplication check.</p>
 <% end %>
 
+<div id="preview-fetch-error" class="alert alert-alert" style="display: none;" role="alert" aria-live="polite"></div>
+
 <%= form_with url: preview_update_import_path(@import_session), method: :patch, id: "preview-form", data: { turbo: false } do |f| %>
   <table class="preview-table">
     <colgroup>
@@ -109,6 +111,8 @@
       }).catch(function() {
         return { status: r.status, data: {} };
       });
+    }).catch(function() {
+      return { status: 0, data: {} };
     }).then(function(result) {
       var input = form.querySelector('input[data-row-field="' + fieldId + '"]');
       if (result.status === 200 && result.data) {
@@ -153,10 +157,18 @@
       }
       var navUrl = form.dataset.navigateAfter;
       var hasErrors = result.data && result.data.errors && Object.keys(result.data.errors).length > 0;
+      var errorEl = document.getElementById("preview-fetch-error");
       if (navUrl && result.status === 200 && !hasErrors) {
         delete form.dataset.navigateAfter;
+        if (errorEl) { errorEl.style.display = "none"; errorEl.textContent = ""; }
         var sep = navUrl.indexOf("?") >= 0 ? "&" : "?";
         window.location = navUrl + sep + "t=" + Date.now();
+      } else if (navUrl && errorEl) {
+        var msg = result.status !== 200
+          ? "Something went wrong. Please try again."
+          : "Fix validation errors before continuing.";
+        errorEl.textContent = msg;
+        errorEl.style.display = "block";
       }
     }).finally(function() { delete form.dataset.pendingFlash; });
   });

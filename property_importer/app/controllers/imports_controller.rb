@@ -110,6 +110,7 @@ class ImportsController < ApplicationController
     clear_orphaned_skip_flags
     @summary = build_summary
     @rows_to_import = rows_to_import
+    @has_validation_errors = @rows_to_import.any? { |r| r.validation_errors.present? }
   end
 
   def discard
@@ -124,6 +125,12 @@ class ImportsController < ApplicationController
   def confirm
     if @import_session.committed?
       redirect_to properties_path, notice: "This import was already committed."
+      return
+    end
+    rows = rows_to_import
+    if rows.any? { |r| r.validation_errors.present? }
+      flash[:alert] = "Fix validation errors before confirming the import."
+      redirect_to summary_import_path(@import_session)
       return
     end
     result = ImportCommitService.new(@import_session).call

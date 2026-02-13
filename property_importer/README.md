@@ -2,7 +2,7 @@
 
 An internal-user-facing Rails tool for importing properties and units from a CSV into production. Guided by the [design spec](../BUILD.md).
 
-Built by @mcarlssen for the Payscore Technical Operations Engineer assessment.
+Built by [Mike Thorn](https://x38.dev) for the Payscore Technical Operations Engineer assessment.
 
 ---
 
