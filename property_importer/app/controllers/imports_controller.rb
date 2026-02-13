@@ -194,6 +194,8 @@ class ImportsController < ApplicationController
 
       # Show conflict if: (1) property exists in DB, or (2) within-import duplicates
       # Per BUILD: "look up an existing Property by that composite. If found → conflict."
+      # Property-only imports (no units) appear here ONLY when existing.present? — not because
+      # they lack units, but because the property already exists in the database.
       next unless existing.present? || within_import_duplicate_units.any?
 
       conflicting_units = (db_conflicting_units | within_import_duplicate_units).uniq

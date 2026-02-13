@@ -327,11 +327,56 @@
       .drop-zone.has-file .drop-text { color: var(--clr-success-a20); }
 
       .conflict-card {
+        position: relative;
         margin-bottom: 2rem;
         padding: 1rem;
         border: 1px solid var(--clr-surface-a20);
         border-radius: 4px;
         background: var(--clr-surface-tonal-a0);
+      }
+      .conflict-card > h3:first-child {
+        margin-top: 0;
+      }
+      .conflict-skip-icon {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        padding: 0.25rem;
+        border: none;
+        background: transparent;
+        color: var(--clr-surface-a50);
+        cursor: pointer;
+        border-radius: 4px;
+        transition: color 0.15s, background 0.15s;
+      }
+      .conflict-skip-icon:hover {
+        color: var(--clr-danger-a30);
+        background: rgba(156, 33, 33, 0.15);
+      }
+      .conflict-skip-icon:focus {
+        outline: 2px solid var(--clr-primary-a30);
+        outline-offset: 2px;
+      }
+      .conflict-skip-checkbox {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0,0,0,0);
+        border: 0;
+      }
+      .conflict-card-skipped h3,
+      .conflict-card-skipped p,
+      .conflict-card-skipped h4,
+      .conflict-card-skipped th,
+      .conflict-card-skipped td {
+        text-decoration: line-through;
+        opacity: 0.7;
+      }
+      .conflict-card-skipped .conflict-skip-icon {
+        color: var(--clr-danger-a0);
       }
       .conflict-preview-table { margin-top: 1rem; }
       .conflict-preview-table h4 { margin-bottom: 0.5rem; font-size: 0.95rem; }

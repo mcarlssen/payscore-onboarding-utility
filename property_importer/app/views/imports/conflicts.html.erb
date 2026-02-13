@@ -12,7 +12,7 @@
       <%= link_to "← Back to Preview", preview_import_path(@import_session), class: "btn btn-secondary" %>
       <%= link_to "Next: Summary & confirm", summary_import_path(@import_session), class: "btn" %>
     </div>
-    <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-danger btn-sm", form: { data: { turbo_confirm: "Discard this import? Staged data will be permanently deleted." } } %>
+    <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-danger btn-sm", form: { data: { turbo_confirm: "Discard this import? Staged new data will be permanently deleted." } } %>
   </div>
 <% else %>
 <%= form_with url: conflicts_resolve_import_path(@import_session), method: :patch, local: true, id: "conflicts-form" do |f| %>
@@ -20,19 +20,25 @@
     <input type="hidden" name="conflict_keys[]" value="<%= c[:key] %>" />
     <% first_row = c[:rows].first %>
     <% row_to_unit_key = {}; c[:rows_by_unit].each { |unit_num, unit_rows| unit_rows.each { |r| row_to_unit_key[r.id] = "c#{c_idx}_u#{unit_num}" } } %>
-    <div class="conflict-card">
+    <% has_units = c[:staged_units].any? %>
+    <% is_property_only_duplicate = c[:existing_property] && !has_units %>
+    <div class="conflict-card" data-conflict-key="<%= c[:key] %>" data-skip-property="<%= c[:rows].any?(&:skip_property?) %>">
       <h3><%= first_row.building_name %> — <%= first_row.street_address %>, <%= first_row.city %></h3>
       <% if c[:existing_property] %>
-        <% existing_display = c[:existing_units].any? ? c[:existing_units].join(", ") : "none" %>
-        <% new_units = c[:staged_units] - c[:conflicting_units] %>
-        <% import_adds_display = new_units.any? ? new_units.join(", ") : "property only" %>
-        <p>Existing units in database: <strong><%= existing_display %></strong>. Import adds: <strong><%= import_adds_display %></strong>.</p>
+        <% if is_property_only_duplicate %>
+          <p>This property already exists in the database. This import adds no new units (property-only row). Skip to exclude from import.</p>
+        <% else %>
+          <% existing_display = c[:existing_units].any? ? c[:existing_units].join(", ") : "none" %>
+          <% new_units = c[:staged_units] - c[:conflicting_units] %>
+          <% import_adds_display = new_units.any? ? new_units.join(", ") : "property only" %>
+          <p>Existing units in database: <strong><%= existing_display %></strong>. Import adds: <strong><%= import_adds_display %></strong>.</p>
+        <% end %>
       <% end %>
       <% if c[:db_conflicting_units].any? %>
-        <p class="errors">Unit number(s) already exist in database: <%= c[:db_conflicting_units].join(", ") %>. Click the row you want to keep.</p>
+        <p class="errors">Unit number(s) already exist in database: <%= c[:db_conflicting_units].join(", ") %>. Click the imported row you want to keep.</p>
       <% end %>
       <% if c[:within_import_duplicate_units].any? %>
-        <p class="errors">Duplicate unit(s) within this import: <%= c[:within_import_duplicate_units].join(", ") %>. Click the row you want to keep (others will be skipped).</p>
+        <p class="errors">Duplicate unit(s) within this import: <%= c[:within_import_duplicate_units].join(", ") %>. Click the imported row you want to keep (others will be skipped).</p>
       <% end %>
       <% if c[:conflicting_units].any? %>
         <% c[:conflicting_rows].each do |row| %>
@@ -45,11 +51,8 @@
           <% end %>
         <% end %>
       <% end %>
-      <p>
-        <label><input type="checkbox" name="skip_property[]" value="<%= c[:key] %>" <%= 'checked' if c[:rows].any?(&:skip_property?) %> /> Skip this entire property (do not add any units)</label>
-      </p>
       <div class="conflict-preview-table">
-        <h4>Staged data for this property</h4>
+        <h4>Staged new data for this property</h4>
         <table>
           <thead>
             <tr>
@@ -80,6 +83,10 @@
           </tbody>
         </table>
       </div>
+      <button type="button" class="conflict-skip-icon" title="<%= has_units ? 'Skip this entire property (do not add any units)' : 'Skip this entire property' %>" aria-label="<%= has_units ? 'Skip this entire property (do not add any units)' : 'Skip this entire property' %>">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+      </button>
+      <input type="checkbox" name="skip_property[]" value="<%= c[:key] %>" class="conflict-skip-checkbox" <%= 'checked' if c[:rows].any?(&:skip_property?) %> />
     </div>
   <% end %>
 <% end %>
@@ -88,7 +95,7 @@
     <%= link_to "← Back to Preview", preview_import_path(@import_session), class: "btn btn-secondary" %>
     <button type="submit" form="conflicts-form" class="btn">Next: Summary</button>
   </div>
-  <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-danger btn-sm", form: { data: { turbo_confirm: "Discard this import? Staged data will be permanently deleted." } } %>
+  <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-danger btn-sm", form: { data: { turbo_confirm: "Discard this import? Staged new data will be permanently deleted." } } %>
 </div>
 <script>
 (function() {
@@ -110,6 +117,20 @@
         this.click();
       }
     });
+  });
+
+  document.querySelectorAll('.conflict-skip-icon').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var card = this.closest('.conflict-card');
+      var checkbox = card.querySelector('.conflict-skip-checkbox');
+      checkbox.checked = !checkbox.checked;
+      card.classList.toggle('conflict-card-skipped', checkbox.checked);
+      card.dataset.skipProperty = checkbox.checked ? 'true' : 'false';
+    });
+  });
+
+  document.querySelectorAll('.conflict-card[data-skip-property="true"]').forEach(function(card) {
+    card.classList.add('conflict-card-skipped');
   });
 })();
 </script>

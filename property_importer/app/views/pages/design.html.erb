@@ -1,2 +1,252 @@
-<h2>Design</h2>
-<p>This page will eventually display BUILD.md content.</p>
+<article class="build-spec">
+  <style>
+    .build-spec { max-width: 1080px; }
+    .build-spec h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+    .build-spec h2 { font-size: 1.25rem; margin-top: 2rem; margin-bottom: 0.75rem; color: var(--clr-primary-a30); }
+    .build-spec h3 { font-size: 1.1rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+    .build-spec hr { border: none; border-top: 1px solid var(--clr-surface-a20); margin: 2rem 0; }
+    .build-spec p { margin-bottom: 1rem; line-height: 1.5; }
+    .build-spec ul { margin: 0.5rem 0 1rem 1.5rem; }
+    .build-spec li { margin-bottom: 0.35rem; }
+    .build-spec table { margin: 1rem 0; }
+    .build-spec th, .build-spec td { padding: 0.5rem 0.75rem; border: 1px solid var(--clr-surface-a20); vertical-align: top; }
+    .build-spec th { background: var(--clr-surface-a10); font-weight: 600; }
+    .build-spec pre { background: var(--clr-surface-tonal-a0); border: 1px solid var(--clr-surface-a20); border-radius: 4px; padding: 1rem; overflow-x: auto; font-size: 0.9rem; margin: 1rem 0; }
+    .build-spec code { font-family: ui-monospace, monospace; font-size: 0.9em; }
+    .build-spec strong { color: var(--clr-primary-a40); }
+  </style>
+
+  <h1>Design decisions and project outline</h1>
+  <p>Build spec for building the Technical Operations Engineer take-home: a Ruby on Rails internal tool that lets customer success upload a property spreadsheet, sanity-check and fix data, avoid duplicates, and finalize imports confidently. This document is the single source of truth for architecture, business rules, UI design, and build plan. Schema details live in <a href="#">database-models.md</a>.</p>
+
+  <hr>
+
+  <h2>1. Overview and goals</h2>
+  <p><strong>Objective:</strong> A small Ruby on Rails app for internal users - and arguably external users - to import properties and units from CSV. The CSV format is fixed (see example in repo). The tool should make it easy to:</p>
+  <ul>
+    <li>Upload a CSV and see what the system will import</li>
+    <li>Catch and fix obvious mistakes before anything is permanently saved</li>
+    <li>Avoid importing the same property (or unit) more than once</li>
+    <li>Feel confident when finalizing an import</li>
+  </ul>
+  <p><strong>Scope:</strong> MVP is internal tool only. No authentication to production database. UI can be simple and unpolished. The intent is to demonstrate thoughtful handling of data, reducing deduplication risk, and clear user communication.</p>
+
+  <hr>
+
+  <h2>2. Decisions and assumptions</h2>
+  <table>
+    <thead>
+      <tr><th>Decision</th><th>Choice</th><th>Rationale</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>App could be customer-facing</strong></td>
+        <td>The assessment describes this as strictly an <strong>internal-facing tool</strong>. I see no reason in the given use-case why this couldn't be made a public tool for authenticated users.</td>
+        <td>This is data the customer owns anyway, and they are better positioned to sanity-check and validate data than Payscore employees. As long as the app is only able to write NEW data to the database, and not delete existing data, there is little risk.</td>
+      </tr>
+      <tr>
+        <td><strong>Property unique identifier</strong></td>
+        <td><strong>Building name + full address</strong> <code>(building_name, street_address, city, state, zip_code)</code>.</td>
+        <td>The assessment says building name <em>can be</em> the unique identifier, not <em>must be</em>. There are many scenarios where name-only deduplication is not enough to ensure uniqueness. For example, the same building name in different cities (e.g. "Avenue Apartments" in Seattle vs Boston) must be different properties. Using name+address as the composite key removes ambiguity and eliminates the "same name, different city" auto-dedupe risk.</td>
+      </tr>
+      <tr>
+        <td><strong>Building name normalization</strong></td>
+        <td><strong>Light normalization</strong> (strip, uppercase, remove punctuation) for all fields including building name when matching. No semantic canonicalization (e.g. "Avenue" → "Ave") on building name.</td>
+        <td>Light normalization helps match variations like "Avenue Apartments" vs "Avenue Apartments." (trailing punctuation). Semantic canonicalization could incorrectly merge different buildings; avoid for building name. Address fields may get semantic normalization in a future phase - USPS validation would be a great additional feature.</td>
+      </tr>
+      <tr>
+        <td><strong>Guided duplicate resolution</strong></td>
+        <td><strong>Always surface duplicates and conflicts to the user.</strong> No automatic removal of "duplicate" rows without explicit user choice (keep / delete / delete all, or add units / skip property).</td>
+        <td>Ensures the user stays in control and avoids wrong merges. This finds the balance between machine-driven deduplication, which is idempotent, and human sanity-checking, which can detect edge cases that aren't yet codified.</td>
+      </tr>
+      <tr>
+        <td><strong>Existing-property/unit deduplication</strong></td>
+        <td>If this were a customer-facing app, it must <strong>validate the imported data against the existing database</strong> to avoid overwriting existing data.</td>
+        <td>I decided early on to design this with external customers in mind. The app would need to validate the data against itself (deduplicate the CSV) and then dedupe the new dataset against the existing database. This ensures strong data integrity over time and eliminates the possibility of unwitting duplicate imports.</td>
+      </tr>
+      <tr>
+        <td><strong>Unit-level deduplication</strong></td>
+        <td>Uniqueness is enforced at <strong>unit level</strong> within a property: <code>(property_id, unit_number)</code>. Conflict resolution in MVP supports <strong>unit-level</strong> choices (e.g. keep / skip per unit), not only property-level.</td>
+        <td>Adding unit to the unique check is minimal extra work and gives clearer, safer behavior when the same unit appears in CSV and DB.</td>
+      </tr>
+      <tr>
+        <td><strong>No "merge" function in MVP</strong></td>
+        <td>The ability to <strong>merge an imported property/unit</strong> into an existing database record could be useful in certain scenarios.</td>
+        <td>This requires individual value merging, which is beyond the scope of this MVP. This could be particularly useful if the imported CSV contains other free-text fields in production, like "Notes" or "Description", etc.</td>
+      </tr>
+      <tr>
+        <td><strong>"Autosave" during import and dedup</strong></td>
+        <td>A "staging" database provides reliable <strong>cross-session data persistence</strong> and autosave functionality.</td>
+        <td>In a workflow where humans are still involved, this provides a useful guard against interruptions, browser crashes, etc. Data is staged in the temp database until the final import, when it is moved to the production database.</td>
+      </tr>
+      <tr>
+        <td><strong>Empty Unit</strong></td>
+        <td>Rows with blank Unit create a <strong>Property only</strong>; no Unit record is created.</td>
+        <td>A property owner could be renting a single-family residence where "unit" is superfluous. This function also supports importing additional units later as an update.</td>
+      </tr>
+      <tr>
+        <td><strong>MVP scope</strong></td>
+        <td>No data versioning/immutability, no "resume from row N on import failure," no support for deleting units or properties.</td>
+        <td>These are bonus features I would implement in a production version, but are omitted for speed in this MVP.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr>
+
+  <h2>3. Architecture</h2>
+  <ul>
+    <li><strong>Stack:</strong> Ruby on Rails, PostgreSQL. Relational DB for both production and staged data.</li>
+    <li><strong>Data split:</strong>
+      <ul>
+        <li><strong>Production:</strong> <code>properties</code>, <code>units</code> — only written when the user confirms the import.</li>
+        <li><strong>Staged:</strong> <code>import_sessions</code>, <code>staged_rows</code> — hold the current import in progress; all edits and validation target staged data until confirm.</li>
+      </ul>
+    </li>
+    <li><strong>Flow:</strong> Upload → parse into <code>staged_rows</code> under an <code>ImportSession</code> → user moves through steps (Preview Import → Resolve conflicts → Summary) → single "Confirm import" writes from staged to production inside one DB transaction. On failure, transaction rolls back; staged data remains so the user can fix and retry.</li>
+    <li><strong>Idempotent confirm:</strong> After a successful commit, set session status to <code>committed</code> (or equivalent) and refuse a second commit for that session. Disable the Confirm button after first click to avoid double submit.</li>
+  </ul>
+  <p>High-level flow:</p>
+  <pre><code>Upload CSV → Parse → Staged rows (edit/validate) → Conflict resolution → Summary → Confirm → Production
+                     ↑___________________________________________________________|
+                                      (all edits autosave to staged)</code></pre>
+
+  <hr>
+
+  <h2>4. Data model summary</h2>
+  <ul>
+    <li><strong>Production:</strong> See <a href="#">database-models.md</a>.
+      <ul>
+        <li><strong>Property:</strong> Identified by <code>(building_name, street_address, city, state, zip_code)</code>; unique index on that composite.</li>
+        <li><strong>Unit:</strong> <code>(property_id, unit_number)</code> unique; belongs to Property.</li>
+      </ul>
+    </li>
+    <li><strong>Staged:</strong>
+      <ul>
+        <li><strong>ImportSession:</strong> One per import; <code>status</code> (e.g. draft / committed / failed), optional <code>file_name</code>.</li>
+        <li><strong>StagedRow:</strong> One row per CSV data line; columns mirror CSV (building_name, street_address, unit_number, city, state, zip_code) plus <code>import_session_id</code>, <code>row_number</code>, optional <code>validation_errors</code>. No uniqueness on staged_rows; duplicates are resolved in the UI before commit.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <hr>
+
+  <h2>5. Business rules</h2>
+
+  <h3>5.1 CSV format and required fields</h3>
+  <ul>
+    <li><strong>Columns (expected):</strong> Building Name, Street Address, Unit, City, State, Zip Code.</li>
+    <li><strong>Required:</strong> Building Name, Street Address, City, State, Zip Code. <strong>Unit is optional.</strong></li>
+    <li><strong>Empty Unit:</strong> Treated as property-only; create one Property, zero Units.</li>
+    <li><strong>Validation (MVP):</strong> Flag rows with missing required fields. Optional: zip format (e.g. 5 or 9 digits), state format (e.g. 2-letter or full name as in example).</li>
+  </ul>
+
+  <h3>5.2 Duplicate and conflict logic</h3>
+  <ul>
+    <li><strong>In-CSV grouping:</strong> Rows are grouped by <code>(building_name, street_address, city, state, zip_code)</code>. Each group is one "staged property" with N units (rows that have a non-blank unit_number). Identical rows (same property + same unit_number + same address) are treated as duplicates; surface them and let the user choose keep / delete / delete all.</li>
+    <li><strong>DB lookup:</strong> Property identity in the database is the same composite: <code>(building_name, street_address, city, state, zip_code)</code>. For each staged property (group), look up an existing Property by that composite. If found → conflict.</li>
+    <li><strong>Conflict resolution:</strong>
+      <ul>
+        <li><strong>Property level:</strong> User can choose "Add new units to existing property" or "Skip this property."</li>
+        <li><strong>Unit level:</strong> For "Add new units," compare staged unit numbers to existing <code>Unit</code> records for that property. If a unit number already exists, let the user choose per unit (e.g. skip this unit / keep as new only if different). No silent overwrites; show "Existing: X units. Import adds: Y units. After import: Z units."</li>
+      </ul>
+    </li>
+    <li><strong>No auto-removal:</strong> Never remove or merge rows the system considers "duplicate" without explicit user action.</li>
+  </ul>
+
+  <h3>5.3 Validation and errors</h3>
+  <ul>
+    <li>Parse errors (e.g. bad encoding, unparseable CSV): Show message and, if possible, line number.</li>
+    <li>Row-level validation: Required fields, format rules. Display errors by row number.</li>
+    <li>Do not allow the user to proceed with deduplication if there are validation errors in the imported data (like a missing required field).</li>
+  </ul>
+
+  <hr>
+
+  <h2>6. UI design</h2>
+  <ul>
+    <li><strong>Multi-step layout:</strong> Linear steps with one primary CTA per step. Steps: (1) Upload, (2) Preview Import, (3) Deduplication, (4) Summary & confirm.</li>
+    <li><strong>Progress indicator:</strong> Stepper or tracker so users know where they are and can go back.</li>
+    <li><strong>Preview Import:</strong> Table of staged rows (all CSV columns). Inline edit with autosave to <code>staged_rows</code>; show "Saved" or checkmark on blur. Validation errors per row (e.g. inline or tooltip). </li>
+    <li><strong>Conflict resolution:</strong> For each conflict, show existing vs staged (e.g. side-by-side or clear summary). "Existing: 5 units. Import adds: 3 units. After import: 8 units." Unit-level choices where applicable (keep / skip per unit). Bulk: e.g. "Add all new units to existing properties."</li>
+    <li><strong>Summary before confirm:</strong> Explicit counts, e.g. "You're about to add <strong>3 new properties</strong> (12 units) and <strong>2 existing properties</strong> (5 new units). [Confirm import]." Single primary button: "Confirm import." On success → redirect to "Import complete" or property list; on failure → show error, keep staged data, allow Retry.</li>
+  </ul>
+
+  <hr>
+
+  <h2>7. User flow (step-by-step)</h2>
+  <table>
+    <thead>
+      <tr><th>Step</th><th>Purpose</th><th>What's shown</th><th>Primary action</th><th>Data</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>1. Upload</strong></td>
+        <td>Ingest CSV</td>
+        <td>File input; after parse: success or error message (+ optional error CSV)</td>
+        <td>"Upload" / "Next"</td>
+        <td>Parse into <code>staged_rows</code> for new <code>ImportSession</code></td>
+      </tr>
+      <tr>
+        <td><strong>2. Preview Import</strong></td>
+        <td>Edit and validate</td>
+        <td>Table of staged rows; inline edit; validation errors by row</td>
+        <td>"Next"</td>
+        <td>All edits autosave to <code>staged_rows</code></td>
+      </tr>
+      <tr>
+        <td><strong>3. Deduplication</strong></td>
+        <td>Match staged vs existing</td>
+        <td>List of conflicts (staged property already in DB); per-property and per-unit choices</td>
+        <td>"Add units" / "Skip" (and unit-level); "Next"</td>
+        <td>Read from <code>staged_rows</code> + production <code>properties</code>/<code>units</code></td>
+      </tr>
+      <tr>
+        <td><strong>4. Summary & confirm</strong></td>
+        <td>Final check and commit</td>
+        <td>Counts (new properties, new units, existing updated); single Confirm</td>
+        <td>"Confirm import"</td>
+        <td>Single transaction: staged → production; session status → committed</td>
+      </tr>
+    </tbody>
+  </table>
+  <p><strong>Back:</strong> User can go back to previous steps without losing edits (all in staged).</p>
+  <p><strong>Failure on confirm:</strong> Transaction rollback; show error and "Retry"; staged data unchanged.</p>
+
+  <hr>
+
+  <h2>8. Build plan</h2>
+
+  <h3>8.1 MVP (Phase 1)</h3>
+  <ul>
+    <li>Upload CSV; parse into <code>import_sessions</code> + <code>staged_rows</code>.</li>
+    <li>Steps: Upload → Preview Import → Deduplication → Summary → Confirm.</li>
+    <li>Validation: Required fields; optional format rules (zip, state). Errors by row; optional error CSV download.</li>
+    <li>Property identity: <code>(building_name, street_address, city, state, zip_code)</code> in both staged grouping and production lookup.</li>
+    <li>Unit-level dedup and conflict resolution: User can choose keep/skip per unit when adding to an existing property.</li>
+    <li>Single transaction on confirm; idempotent confirm (disable button / session status).</li>
+  </ul>
+
+  <h3>8.2 Phase 2 / "What we'd improve" (for README)</h3>
+  <ul>
+    <li><strong>Immutability / forensics:</strong> Append-only writes with timestamp; soft delete via <code>is_valid</code> (or equivalent) so nothing is lost and support can explain "what happened."</li>
+    <li><strong>Resume from row N:</strong> If parse or validation fails partway through a large file, let the user fix the row and re-run import from that row to the end.</li>
+    <li><strong>Deleting units or properties:</strong> Not in MVP; could add via a column in the CSV or a separate flow, with safeguards.</li>
+    <li><strong>Address normalization:</strong> Optional internal normalization (e.g. "Avenue" → "Ave") or USPS/UPS lookup with user confirmation; only for address fields, not building name.</li>
+    <li><strong>Configurable validation rules:</strong> e.g. YAML/JSON so business rules can change without code changes.</li>
+    <li><strong>Data versioning</strong>, data immutability, "resume import from row N" on failure, bulk deletion of units or properties via CSV.</li>
+    <li><strong>USPS/UPS or external address API integration</strong> for semantic canonicalization of address fields.</li>
+  </ul>
+
+  <hr>
+
+  <h2>9. Technical implementation notes</h2>
+  <ul>
+    <li><strong>Rails:</strong> Use a recent stable version; PostgreSQL for all environments.</li>
+    <li><strong>CSV storage:</strong> Either attach the file to <code>ImportSession</code> (e.g. Active Storage) for audit, or only persist parsed data in <code>staged_rows</code>; document the choice.</li>
+    <li><strong>Confirm:</strong> One ActiveRecord transaction: create/update <code>properties</code> and <code>units</code> from staged data, then set <code>import_sessions.status = 'committed'</code>. On exception, rollback and set status to <code>failed</code> (or leave <code>draft</code>) so user can retry.</li>
+    <li><strong>No auth / no multi-tenancy:</strong> Single user; no scoping by tenant or user.</li>
+    <li><strong>Styling:</strong> CSS theme from <a href="https://colorffy.com/dark-theme-generator?colors=cb770f-121212&success=22946E&warning=A87A2A&danger=9C2121&info=21498A&primaryCount=6&surfaceCount=6" target="_blank" rel="noopener">colorffy.com dark theme</a></li>
+  </ul>
+
+</article>

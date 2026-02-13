@@ -3,7 +3,10 @@
 class StagedRow < ApplicationRecord
   belongs_to :import_session
 
-  validates :row_number, :building_name, :street_address, :city, :state, :zip_code, presence: true
+  # row_number is always set by the parser. Address fields (building_name, street_address, city, state, zip_code)
+  # are validated in run_validations/CsvImportParser and stored in validation_errors—we allow blanks here
+  # so the import can stage all rows and show errors on the preview page instead of raising 422.
+  validates :row_number, presence: true
 
   def unit_number_present?
     unit_number.present? && unit_number.to_s.strip.present?
