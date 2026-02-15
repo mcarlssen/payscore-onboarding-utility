@@ -63,6 +63,7 @@
   <div class="preview-actions-left">
     <%= link_to "← Back", root_path, class: "btn btn-secondary" %>
     <%= link_to "Next: Deduplication", conflicts_import_path(@import_session), class: "btn", id: "preview-next-link", data: { conflicts_url: conflicts_import_path(@import_session) } %>
+    <span class="row-count-badge" title="Rows parsed from CSV"><%= @staged_rows.size %> rows</span>
   </div>
   <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-danger btn-sm", form: { data: { turbo_confirm: "Discard this import? Staged data will be permanently deleted." } } %>
 </div>

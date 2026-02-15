@@ -68,6 +68,7 @@
       <div class="preview-actions-left">
         <%= link_to "← Back to Deduplication", conflicts_import_path(@import_session), class: "btn btn-secondary" %>
         <%= button_to "Confirm import", confirm_import_path(@import_session), method: :post, class: "btn", id: "confirm-import-btn", disabled: @has_validation_errors, form: { id: "confirm-import-form", data: { turbo: false } } %>
+        <span class="row-count-badge" title="Rows to be imported"><%= @rows_to_import.size %> rows</span>
       </div>
       <%= button_to "Discard import", discard_import_path(@import_session), method: :delete, class: "btn btn-danger btn-sm", form: { data: { turbo_confirm: "Discard this import? Staged data will be permanently deleted." } } %>
     </div>
